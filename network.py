@@ -15,12 +15,19 @@ class InputNode:
     def evaluate(self):
         return self.value
 
+    def clear(self):
+        self.value = None
+
+    def get_value(self):
+        return self.value
+
 class Neuron:
     def __init__(self, inputs, activation='relu'):
         self.previous = inputs
         self.n_inputs = len(inputs)
         self.weights = np.array([random.random()*0.01 for _ in range(self.n_inputs)])
         self.bias = random.random() * 0.01
+        self.current_output = None
         # define activation functions
         if activation == 'relu':
             self.activation = relu
@@ -30,9 +37,18 @@ class Neuron:
             self.activation = linear
 
     def evaluate(self):
-        inputs = np.array([node.evaluate() for node in self.previous])
-        z = np.dot(inputs, self.weights) + self.bias
-        return self.activation(z)
+        if self.current_output is None:
+            inputs = np.array([node.evaluate() for node in self.previous])
+            z = np.dot(inputs, self.weights) + self.bias
+            output = self.activation(z)
+            self.current_output = output
+        return self.current_output
+
+    def get_value(self):
+        return self.current_output
+
+    def clear(self):
+        self.current_output = None
 
 
 class Network:
@@ -105,11 +121,35 @@ class Network:
             connections_to_output = [build_neuron(j) for j in connection_indices]
             self.output_layer[i] = Neuron(connections_to_output)
 
+    def solve(self, input_values, clear_node_outputs=True):
+        if len(input_values) != len(self.input_layer):
+            raise Exception
+        for node, value in zip(self.input_layer.values(), input_values):
+            node.set_value(value)
+        outputs = [node.evaluate() for node in self.output_layer.values()]
+        if clear_node_outputs:
+            self.clear_node_outputs()
+        return outputs
+
+    def clear_node_outputs(self):
+        def clear(node):
+            if node.get_value() is None:
+                return
+            node.clear()
+            if type(node) == InputNode:
+                return
+            for previous_node in node.previous:
+                clear(previous_node)
+        for output_node in self.output_layer.values():
+            clear(output_node)
 
 
 if __name__ == '__main__':
-    net = Network(50, 5, 2, p_connect_input=0.1, p_connect_hidden=0.2, p_connect_output=0.1)
+    net = Network(5, 2, 2, p_connect_input=0.5, p_connect_hidden=0.5, p_connect_output=0.5)
+    print('building network')
     net.build_network()
+    print('forward propagation')
+    print(net.solve([0.1,0.3]))
 
 
 
