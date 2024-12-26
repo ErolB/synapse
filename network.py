@@ -12,14 +12,14 @@ class InputNode:
     def set_value(self, new_value):
         self.value = new_value
 
+    def get_value(self):
+        return self.value
+
     def evaluate(self):
         return self.value
 
     def clear(self):
         self.value = None
-
-    def get_value(self):
-        return self.value
 
 class Neuron:
     def __init__(self, inputs, activation='relu'):
@@ -28,19 +28,20 @@ class Neuron:
         self.weights = np.array([random.random()*0.01 for _ in range(self.n_inputs)])
         self.bias = random.random() * 0.01
         self.current_output = None
+        self.gradient = None
         # define activation functions
         if activation == 'relu':
-            self.activation = relu
+            self.activation = ReluActivation
         elif activation == 'sigmoid':
-            self.activation = sigmoid
+            self.activation = SigmoidActivation
         else:
-            self.activation = linear
+            self.activation = LinearActivation
 
     def evaluate(self):
         if self.current_output is None:
             inputs = np.array([node.evaluate() for node in self.previous])
             z = np.dot(inputs, self.weights) + self.bias
-            output = self.activation(z)
+            output = self.activation.function(z)
             self.current_output = output
         return self.current_output
 
@@ -145,11 +146,11 @@ class Network:
 
 
 if __name__ == '__main__':
-    net = Network(5, 2, 2, p_connect_input=0.5, p_connect_hidden=0.5, p_connect_output=0.5)
+    net = Network(10, 3, 2, p_connect_input=0.1, p_connect_hidden=0.5, p_connect_output=0.1)
     print('building network')
     net.build_network()
     print('forward propagation')
-    print(net.solve([0.1,0.3]))
+    print(net.solve([0.1,0.3,0.4]))
 
 
 

@@ -3,19 +3,62 @@ import numpy as np
 import random
 import copy
 
-# activation functions
+# activation functions + derivatives
 
-def sigmoid(z):
-    return np.exp(z) / (1 + np.exp(z))
+class SigmoidActivation:
+    def __init__(self):
+        self.name = 'sigmoid'
 
-def relu(z):
-    if z < 0:
-        return 0
-    else:
+    @staticmethod
+    def function(z):
+        return np.exp(z) / (1 + np.exp(z))
+
+    def derivative(self, z):
+        return self.function(z) * (1 - self.function(z))
+
+class ReluActivation:
+    def __init__(self):
+        self.name = 'relu'
+
+    @staticmethod
+    def function(z):
+        if z < 0:
+            return 0
+        else:
+            return z
+
+    @staticmethod
+    def derivative(z):
+        if z < 0:
+            return 0
+        else:
+            return 1
+
+class LinearActivation:
+    def __init__(self):
+        self.name = 'linear'
+
+    @staticmethod
+    def function(z):
         return z
 
-def linear(z):
-    return z
+    @staticmethod
+    def derivative(z):
+        return 1
+
+# loss functions
+
+class MSE:
+    def __init__(self):
+        self.name = 'mse'
+
+    @staticmethod
+    def function(output, target):
+        return sum([(o-y)**2 for o, y in zip(output, target)]) / len(output) * 0.5
+
+    @staticmethod
+    def derivative(output, target):
+        return [o-y for o, y in zip(output, target)]
 
 # graph functions
 
