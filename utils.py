@@ -95,6 +95,15 @@ def max_path_length(node_index, adj_matrix):
     return dfs_distance(node_index, 0, adj_matrix)
 
 
+# miscellaneous function
+
+def one_hot(data_1d):
+    data_array = np.zeros((data_1d.shape[0], max(data_1d)+1))
+    for i in range(data_1d.shape[0]):
+        data_array[i,data_1d[i]] = 1
+    return data_array
+
+
 if __name__ == "__main__":
     adj = [[0,0,0,0],
            [1,0,0,0],
