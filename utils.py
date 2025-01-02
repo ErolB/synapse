@@ -13,8 +13,10 @@ class SigmoidActivation:
     def function(z):
         return np.exp(z) / (1 + np.exp(z))
 
-    def derivative(self, z):
-        return self.function(z) * (1 - self.function(z))
+    @staticmethod
+    def derivative(z):
+        temp = np.exp(z) / (1 + np.exp(z))
+        return temp * (1 - temp)
 
 class ReluActivation:
     def __init__(self):

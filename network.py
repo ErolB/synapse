@@ -82,7 +82,7 @@ class Neuron:
 
 class Network:
     def __init__(self, n_neurons, n_inputs, n_outputs, p_connect_hidden=0.5, p_connect_input=0.1, p_connect_output=0.1,
-                 max_distance=None, cost_function=MSE, learning_rate=0.01):
+                 max_distance=None, cost_function=MSE, learning_rate=0.001):
         if max_distance is None:
             max_distance = int(np.sqrt(n_neurons))
         self.input_layer = {i: InputNode(i) for i in range(n_inputs)}
@@ -209,10 +209,10 @@ class Network:
                 return
             for previous_node in neuron.weight_mapping:
                 w = neuron.weight_mapping[previous_node]
-                new_w = w * -neuron.get_gradient() * previous_node.get_value() * self.learning_rate
+                new_w = w - (neuron.get_gradient() * previous_node.get_value() * self.learning_rate)
                 neuron.weight_mapping[previous_node] = new_w
             current_bias = neuron.get_bias()
-            new_bias = current_bias * -neuron.get_gradient() * self.learning_rate
+            new_bias = current_bias - (neuron.get_gradient() * self.learning_rate)
             neuron.set_bias(new_bias)
         for node in self.output_layer.values():
             adjust_neuron(node)
@@ -245,16 +245,35 @@ if __name__ == '__main__':
     data = datasets.load_iris()
     flower_info = data['data']
     targets = one_hot(data['target'])
-    net = Network(20, 4, 3, p_connect_input=0.2, p_connect_hidden=0.5, p_connect_output=0.2, learning_rate=1)
+    # shuffle data
+    order = list(range(len(flower_info)))
+    random.shuffle(order)
+    flower_info = flower_info[order,:]
+    targets = targets[order,:]
+    training_data = flower_info[:120,:]
+    training_targets = targets[:120,:]
+    testing_data = flower_info[120:,:]
+    testing_targets = targets[120:,:]
+    # train model
+    net = Network(50, 4, 3, p_connect_input=0.2, p_connect_hidden=0.2, p_connect_output=0.2, learning_rate=0.01)
     print('building network')
     net.build_network()
     print('forward propagation')
     #print(net.solve([0.1,0.3,0.4], clear_node_outputs=False))
     #net.compute_all_gradients([0.5,0.5])
     print('done')
-    net.train(flower_info, targets)
-    print('test')
-    print(net.solve(list(flower_info[-1,:])))
+    net.train(training_data, training_targets, epochs=100)
+    # test model
+    accuracy = 0
+    for i in range(len(testing_data)):
+        test_output = net.solve(testing_data[i,:], clear_node_outputs=True)
+        expected_label = list(testing_targets[i,:]).index(1)
+        actual_label = list(test_output).index(max(test_output))
+        if expected_label == actual_label:
+            accuracy += 1
+    print(accuracy/len(testing_data))
+
+
 
 
 
