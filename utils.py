@@ -6,6 +6,9 @@ import copy
 # activation functions + derivatives
 
 class SigmoidActivation:
+    """
+    This class defines the sigmoid activation function and its derivative
+    """
     def __init__(self):
         self.name = 'sigmoid'
 
@@ -19,6 +22,9 @@ class SigmoidActivation:
         return temp * (1 - temp)
 
 class ReluActivation:
+    """
+    This class defines the rectified linear unit (ReLU) activation function and its derivative
+    """
     def __init__(self):
         self.name = 'relu'
 
@@ -37,6 +43,9 @@ class ReluActivation:
             return 1
 
 class LinearActivation:
+    """
+    This class defines the linear activation and its derivative
+    """
     def __init__(self):
         self.name = 'linear'
 
@@ -51,6 +60,9 @@ class LinearActivation:
 # loss functions
 
 class MSE:
+    """
+    This class defines the mean squared error (MSE) loss function and its derivative
+    """
     def __init__(self):
         self.name = 'mse'
 
@@ -65,6 +77,14 @@ class MSE:
 # graph functions
 
 def dfs_cycle(node_index, adj_matrix, visited, coverage):
+    """
+    node_index: the index of the current node
+    adj_matrix: an adjacency matrix for all hidden neurons
+    visited: a dictionary mapping node indices to Boolean values representing whether a node has been examined in the current run
+    coverage: a dictionary mapping node indices to Boolean values representing whether a node has been visited at any point
+
+    This function examines nodes in a directed graph to detect cycles via a depth-first search
+    """
     if visited[node_index]:
         return True
     if coverage[node_index]:
@@ -79,6 +99,12 @@ def dfs_cycle(node_index, adj_matrix, visited, coverage):
     return False  # no cycles found
 
 def detect_cycle(adj_matrix):
+    """
+    adj_matrix: an adjacency matrix for all hidden neurons
+
+    This function iterates through the hidden neurons, using each one as a starting point for 'dfs_cycle'. The purpose
+    is to detect any cycles in the network
+    """
     coverage = {i: False for i in range(adj_matrix.shape[0])}
     for starting_point in range(adj_matrix.shape[0]):
         visited = {i: False for i in range(adj_matrix.shape[0])}
@@ -87,6 +113,14 @@ def detect_cycle(adj_matrix):
     return False
 
 def dfs_distance(node_index, distance, adj_matrix):
+    """
+    node_index: the index of the current node
+    distance: the distance of the path taken to reach the current node
+    adj_matrix: an adjacency matrix for all hidden neurons
+
+    This function performs a depth-first search to determine the maximum path length through the network from a given
+    starting point.
+    """
     previous_nodes = [i for i in range(adj_matrix.shape[0]) if adj_matrix[node_index, i] == 1]
     if len(previous_nodes) == 0:
         return distance
@@ -94,12 +128,25 @@ def dfs_distance(node_index, distance, adj_matrix):
     return max(lengths)
 
 def max_path_length(node_index, adj_matrix):
+    """
+    node_index: the index of the starting point
+    adj_matrix: an adjacency matrix for all hidden neurons
+
+    This function calls 'dfs_distance' with a distance parameter of zero
+    """
     return dfs_distance(node_index, 0, adj_matrix)
 
 
 # miscellaneous function
 
 def one_hot(data_1d):
+    """
+    data_1d: a one-dimensional array of numerical data
+
+    This function converts a one-dimensional array to one-hot format. The length of the output array is the same as the
+    length of the input, and the width is equal to the maximum value in the input. Each row contains a single value of
+    one, while the other values are zero.
+    """
     data_array = np.zeros((data_1d.shape[0], max(data_1d)+1))
     for i in range(data_1d.shape[0]):
         data_array[i,data_1d[i]] = 1
