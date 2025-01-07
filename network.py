@@ -4,16 +4,51 @@ import random
 from sklearn import datasets
 from utils import *
 
-class InputNode:
-    """
-    This class defines the behavior of input nodes. The purpose of an input node is to store and transmit the inputs
-    of the network. No computation happens here.
-    """
+class Node:
     def __init__(self, id):
         self.id = id
         self.value = None
         self.current_z = None
         self.gradient = None
+        self.activation = None
+        self.current_output = None
+
+    def get_value(self):
+        """
+        This method returns the current output of the node.
+        """
+        return self.current_output
+
+    def get_gradient(self):
+        """
+        This method retrieves the current gradient at the node.
+        """
+        return self.gradient
+
+    def set_gradient(self, value):
+        """
+        value: updated gradient
+
+        This method retrieves the current gradient at the node.
+        """
+        self.gradient = value
+
+    def clear(self):
+        """
+        This method clears the stored gradient and output.
+        """
+        self.current_output = None
+        self.current_z = None
+        self.gradient = None
+
+
+class InputNode(Node):
+    """
+    This class defines the behavior of input nodes. The purpose of an input node is to store and transmit the inputs
+    of the network. No computation happens here.
+    """
+    def __init__(self, id):
+        super().__init__(id)
         self.activation = LinearActivation  # hardwired linear function
 
     def set_value(self, new_value):
@@ -24,26 +59,7 @@ class InputNode:
         """
         self.value = new_value
         self.current_z = new_value
-
-    def get_value(self):
-        """
-        This method returns the input value currently stored by the node
-        """
-        return self.value
-
-    def get_gradient(self):
-        """
-        This method retrieves the gradient at this point (if already computed)
-        """
-        return self.gradient
-
-    def set_gradient(self, value):
-        """
-        value: new gradient
-
-        This method allows the gradient to be defined
-        """
-        self.gradient = value
+        self.current_output = new_value
 
     def evaluate(self):
         """
@@ -51,30 +67,19 @@ class InputNode:
         """
         return self.value
 
-    def clear(self):
-        """
-        This method clears the input values and gradient.
-        """
-        self.value = None
-        self.current_z = None
-        self.gradient = None
-
-class Neuron:
+class Neuron(Node):
     """
     This class defines the behavior of neuron. Neurons retrieve values from connected nodes, compute a weighted sum, and
     apply an activation function.
     """
     def __init__(self, id, inputs, activation=ReluActivation):
-        self.id = id
+        super().__init__(id)
         self.previous = inputs  # a list of references to preceding nodes
         self.n_inputs = len(inputs)
         self.weight_mapping = {inputs[i]: random.random()*0.1 for i in range(self.n_inputs)}
         # Node (neuron or input node) objects are mapped to weights. Weights are randomly initialized and can be
         # updated during backpropagation
         self.bias = random.random() * 0.1
-        self.current_output = None
-        self.current_z = None  # weighted sum of inputs
-        self.gradient = None  # derivative of cost function with respect to z
         self.activation = activation
 
     def get_bias(self):
@@ -110,34 +115,6 @@ class Neuron:
             output = self.activation.function(z)
             self.current_output = output
         return self.current_output
-
-    def get_value(self):
-        """
-        This method returns the current output of the neuron.
-        """
-        return self.current_output
-
-    def get_gradient(self):
-        """
-        This method retrieves the current gradient at the neuron.
-        """
-        return self.gradient
-
-    def set_gradient(self, value):
-        """
-        value: updated gradient
-
-        This method retrieves the current gradient at the neuron.
-        """
-        self.gradient = value
-
-    def clear(self):
-        """
-        This method clears the stored gradient and output.
-        """
-        self.current_output = None
-        self.current_z = None
-        self.gradient = None
 
 
 class Network:
