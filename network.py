@@ -119,56 +119,20 @@ class Neuron(Node):
 
 class Network:
     """
-    This class defines the behavior of a network. This includes construction, evaluation, and training.
+    This is a base class that defines the behavior of a network.
     """
-    def __init__(self, n_neurons, n_inputs, n_outputs, p_connect_hidden=0.5, p_connect_input=0.1, p_connect_output=0.1,
-                 max_distance=None, cost_function=MSE, learning_rate=0.001):
-        if max_distance is None:
-            # by default, the longest path between the input and output layers is the square root of the network size
-            max_distance = int(np.sqrt(n_neurons))
+    def __init__(self, n_inputs, n_outputs, cost_function=MSE, learning_rate=0.001):
         self.input_layer = {i: InputNode(i) for i in range(n_inputs)}  # initializes input layer
-        self.neurons = {i: None for i in range(n_neurons)}  # a dictionary that will later contain hidden neurons
+        self.neurons = {}  # a dictionary that will later contain hidden neurons
         self.output_layer = {i: None for i in range(n_outputs)}  # a dictionary that will later contain output neurons
         self.cost_function = cost_function
         self.learning_rate = learning_rate
-        self.n_neurons = n_neurons
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
-        # randomly define connections to input layer
-        self.input_connections = np.zeros((n_inputs, n_neurons))  # adjacency matrix for hidden neurons
-        for i in range(n_inputs):
-            for j in range(n_neurons):
-                if random.random() <= p_connect_input:
-                    self.input_connections[i, j] = 1
-        # randomly define connections to output layer
-        self.output_connections = np.zeros((n_outputs, n_neurons))
-        for i in range(n_outputs):
-            for j in range(n_neurons):
-                if random.random() <= p_connect_output:
-                    self.output_connections[i, j] = 1
-        # define connections in hidden portion
-        self.hidden_connections = np.zeros((n_neurons, n_neurons))
-        for i in range(n_neurons):
-            for j in range(n_neurons):
-                if random.random() <= p_connect_hidden:  # decides whether to try connecting two neurons
-                    test_matrix = copy.copy(self.hidden_connections)  # a temporary matrix used to test viability
-                    test_matrix[i,j] = 1
-                    # check for cycles
-                    if detect_cycle(test_matrix):
-                        continue
-                    # check maximum path length
-                    max_distance_exceeded = False
-                    for k in range(n_outputs):
-                        connected_nodes = [l for l in range(n_inputs) if self.output_connections[k,l]==1]
-                        for n in connected_nodes:
-                            if max_path_length(n, test_matrix) > max_distance:
-                                max_distance_exceeded = True
-                                break
-                        if max_distance_exceeded:
-                            break
-                    if not max_distance_exceeded:
-                        self.hidden_connections = test_matrix
-
+        self.n_neurons = None
+        self.input_connections = None  # adjacency matrix for input nodes and hidden neurons (defined in subclasses)
+        self.hidden_connections = None  # adjacency matrix for hidden neurons (defined in subclasses)
+        self.output_connections = None  # adjacency matrix for hidden neurons and output neurons (defined in subclasses)
 
     def build_network(self):
         """
@@ -325,6 +289,56 @@ class Network:
             clear(output_node)  # start with output nodes
 
 
+class RandomNetwork(Network):
+    """
+    This class is for creating networks with random connections
+    """
+    def __init__(self, n_neurons, n_inputs, n_outputs, p_connect_hidden=0.5, p_connect_input=0.1,
+                 p_connect_output=0.1, max_distance=None, cost_function=MSE, learning_rate=0.001):
+        super().__init__(n_inputs, n_outputs, cost_function=cost_function, learning_rate=learning_rate)
+        self.n_neurons = n_neurons
+        self.neurons = {i: None for i in range(n_neurons)}  # a dictionary that will later contain hidden neurons
+        self.input_connections = np.zeros((n_inputs, n_neurons))  # adjacency matrix for input nodes and hidden neurons
+        self.hidden_connections = np.zeros((n_neurons, n_neurons))  # adjacency matrix for hidden neurons
+        self.output_connections = np.zeros((n_outputs, n_neurons))  # adjacency matrix for hidden neurons and outputs
+        self.define_connections(p_connect_hidden=p_connect_hidden, p_connect_input=p_connect_input,
+                                p_connect_output=p_connect_output, max_distance=max_distance)
+
+    def define_connections(self, p_connect_hidden=0.5, p_connect_input=0.1, p_connect_output=0.1, max_distance=None):
+        if max_distance is None:
+            max_distance = int(np.sqrt(self.n_neurons)*1.5)
+        for i in range(self.n_inputs):
+            for j in range(self.n_neurons):
+                if random.random() <= p_connect_input:
+                    self.input_connections[i, j] = 1
+            # randomly define connections to output layer
+        for i in range(self.n_outputs):
+            for j in range(self.n_neurons):
+                if random.random() <= p_connect_output:
+                    self.output_connections[i, j] = 1
+        # define connections in hidden portion
+        for i in range(self.n_neurons):
+            for j in range(self.n_neurons):
+                if random.random() <= p_connect_hidden:  # decides whether to try connecting two neurons
+                    test_matrix = copy.copy(self.hidden_connections)  # a temporary matrix used to test viability
+                    test_matrix[i, j] = 1
+                    # check for cycles
+                    if detect_cycle(test_matrix):
+                        continue
+                    # check maximum path length
+                    max_distance_exceeded = False
+                    for k in range(self.n_outputs):
+                        connected_nodes = [l for l in range(self.n_inputs) if self.output_connections[k, l] == 1]
+                        for n in connected_nodes:
+                            if max_path_length(n, test_matrix) > max_distance:
+                                max_distance_exceeded = True
+                                break
+                        if max_distance_exceeded:
+                            break
+                    if not max_distance_exceeded:
+                        self.hidden_connections = test_matrix
+
+
 if __name__ == '__main__':
     data = datasets.load_iris()
     flower_info = data['data']
@@ -339,7 +353,7 @@ if __name__ == '__main__':
     testing_data = flower_info[120:,:]
     testing_targets = targets[120:,:]
     # train model
-    net = Network(40, 4, 3, p_connect_input=0.2, p_connect_hidden=0.2, p_connect_output=0.2,
+    net = RandomNetwork(40, 4, 3, p_connect_input=0.2, p_connect_hidden=0.2, p_connect_output=0.2,
                   learning_rate=0.01)
     print('building network')
     net.build_network()
