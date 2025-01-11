@@ -129,7 +129,7 @@ class Network:
         self.learning_rate = learning_rate
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
-        self.n_neurons = None
+        self.n_neurons = None  # defined in subclasses
         self.input_connections = None  # adjacency matrix for input nodes and hidden neurons (defined in subclasses)
         self.hidden_connections = None  # adjacency matrix for hidden neurons (defined in subclasses)
         self.output_connections = None  # adjacency matrix for hidden neurons and output neurons (defined in subclasses)
@@ -338,6 +338,30 @@ class RandomNetwork(Network):
                     if not max_distance_exceeded:
                         self.hidden_connections = test_matrix
 
+class LayeredNetwork(Network):
+    def __init__(self, n_inputs, n_outputs, n_layers, hidden_layer_width, cost_function=MSE, learning_rate=0.001):
+        super().__init__(n_inputs, n_outputs, cost_function=cost_function, learning_rate=learning_rate)
+        self.n_neurons = n_layers * hidden_layer_width
+        self.neurons = {i: None for i in range(self.n_neurons)}  # a dictionary that will later contain hidden neurons
+        self.input_connections = np.zeros((n_inputs, self.n_neurons))  # adjacency matrix for input nodes and hidden neurons
+        self.hidden_connections = np.zeros((self.n_neurons, self.n_neurons))  # adjacency matrix for hidden neurons
+        self.output_connections = np.zeros((n_outputs, self.n_neurons))  # adjacency matrix for hidden neurons and outputs
+        self.define_connections(n_layers, hidden_layer_width)
+
+    def define_connections(self, n_layers, hidden_layer_width):
+        for i in range(self.n_inputs):
+            for j in range(hidden_layer_width):
+                self.input_connections[i,j] = 1  # connect all input nodes to first layer
+        for i in range(self.n_outputs):
+            for j in range(hidden_layer_width):
+                self.output_connections[i, self.n_neurons-j-1] = 1  # connect all output neurons to last layer
+        for i in range(n_layers-1):
+            for j in range(hidden_layer_width):
+                for k in range(hidden_layer_width):
+                    input_node_index = (i+1) * hidden_layer_width + j
+                    output_node_index = i * hidden_layer_width + k
+                    self.hidden_connections[input_node_index, output_node_index] = 1
+
 
 if __name__ == '__main__':
     data = datasets.load_iris()
@@ -353,8 +377,9 @@ if __name__ == '__main__':
     testing_data = flower_info[120:,:]
     testing_targets = targets[120:,:]
     # train model
-    net = RandomNetwork(40, 4, 3, p_connect_input=0.2, p_connect_hidden=0.2, p_connect_output=0.2,
-                  learning_rate=0.01)
+    #net = RandomNetwork(25, 4, 3, p_connect_input=0.2, p_connect_hidden=0.2, p_connect_output=0.2,
+    #              learning_rate=0.01)
+    net = LayeredNetwork(4, 3, 5, 8)
     print('building network')
     net.build_network()
     print('forward propagation')
