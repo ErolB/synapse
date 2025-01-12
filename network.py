@@ -76,10 +76,10 @@ class Neuron(Node):
         super().__init__(id)
         self.previous = inputs  # a list of references to preceding nodes
         self.n_inputs = len(inputs)
-        self.weight_mapping = {inputs[i]: random.random()*0.1 for i in range(self.n_inputs)}
+        self.weight_mapping = {inputs[i]: random.random()*0.01 for i in range(self.n_inputs)}
         # Node (neuron or input node) objects are mapped to weights. Weights are randomly initialized and can be
         # updated during backpropagation
-        self.bias = random.random() * 0.1
+        self.bias = random.random() * 0.01
         self.activation = activation
 
     def get_bias(self):
@@ -293,20 +293,19 @@ class RandomNetwork(Network):
     """
     This class is for creating networks with random connections
     """
-    def __init__(self, n_neurons, n_inputs, n_outputs, p_connect_hidden=0.5, p_connect_input=0.1,
-                 p_connect_output=0.1, max_distance=None, cost_function=MSE, learning_rate=0.001):
+    def __init__(self, n_neurons, n_inputs, n_outputs, p_connect_input=0.1,p_connect_output=0.1, max_distance=None,
+                 cost_function=MSE, learning_rate=0.001):
         super().__init__(n_inputs, n_outputs, cost_function=cost_function, learning_rate=learning_rate)
         self.n_neurons = n_neurons
         self.neurons = {i: None for i in range(n_neurons)}  # a dictionary that will later contain hidden neurons
         self.input_connections = np.zeros((n_inputs, n_neurons))  # adjacency matrix for input nodes and hidden neurons
         self.hidden_connections = np.zeros((n_neurons, n_neurons))  # adjacency matrix for hidden neurons
         self.output_connections = np.zeros((n_outputs, n_neurons))  # adjacency matrix for hidden neurons and outputs
-        self.define_connections(p_connect_hidden=p_connect_hidden, p_connect_input=p_connect_input,
-                                p_connect_output=p_connect_output, max_distance=max_distance)
+        self.define_connections(p_connect_input=p_connect_input, p_connect_output=p_connect_output, max_distance=max_distance)
 
-    def define_connections(self, p_connect_hidden=0.5, p_connect_input=0.1, p_connect_output=0.1, max_distance=None):
+    def define_connections(self, p_connect_input=0.1, p_connect_output=0.1, max_distance=None):
         if max_distance is None:
-            max_distance = int(np.sqrt(self.n_neurons)*1.5)
+            max_distance = int(np.sqrt(self.n_neurons))
         for i in range(self.n_inputs):
             for j in range(self.n_neurons):
                 if random.random() <= p_connect_input:
@@ -317,26 +316,32 @@ class RandomNetwork(Network):
                 if random.random() <= p_connect_output:
                     self.output_connections[i, j] = 1
         # define connections in hidden portion
-        for i in range(self.n_neurons):
-            for j in range(self.n_neurons):
-                if random.random() <= p_connect_hidden:  # decides whether to try connecting two neurons
-                    test_matrix = copy.copy(self.hidden_connections)  # a temporary matrix used to test viability
-                    test_matrix[i, j] = 1
-                    # check for cycles
-                    if detect_cycle(test_matrix):
-                        continue
-                    # check maximum path length
-                    max_distance_exceeded = False
-                    for k in range(self.n_outputs):
-                        connected_nodes = [l for l in range(self.n_inputs) if self.output_connections[k, l] == 1]
-                        for n in connected_nodes:
-                            if max_path_length(n, test_matrix) > max_distance:
-                                max_distance_exceeded = True
-                                break
-                        if max_distance_exceeded:
+        input_nodes = list(range(self.n_neurons))
+        random.shuffle(input_nodes)
+        output_nodes = list(range(self.n_neurons))
+        random.shuffle(output_nodes)
+        for i in input_nodes:
+            for j in output_nodes:
+                if i == j:
+                    continue
+                test_matrix = copy.copy(self.hidden_connections)  # a temporary matrix used to test viability
+                test_matrix[i, j] = 1
+                # check for cycles
+                if detect_cycle(test_matrix):
+                    continue
+                # check maximum path length
+                max_distance_exceeded = False
+                for k in range(self.n_outputs):
+                    connected_nodes = [l for l in range(self.n_inputs) if self.output_connections[k, l] == 1]
+                    for n in connected_nodes:
+                        if max_path_length(n, test_matrix) > max_distance:
+                            max_distance_exceeded = True
                             break
-                    if not max_distance_exceeded:
-                        self.hidden_connections = test_matrix
+                    if max_distance_exceeded:
+                        break
+                if not max_distance_exceeded:
+                    self.hidden_connections = test_matrix
+
 
 class LayeredNetwork(Network):
     def __init__(self, n_inputs, n_outputs, n_layers, hidden_layer_width, cost_function=MSE, learning_rate=0.001):
@@ -377,16 +382,15 @@ if __name__ == '__main__':
     testing_data = flower_info[120:,:]
     testing_targets = targets[120:,:]
     # train model
-    #net = RandomNetwork(25, 4, 3, p_connect_input=0.2, p_connect_hidden=0.2, p_connect_output=0.2,
-    #              learning_rate=0.01)
-    net = LayeredNetwork(4, 3, 5, 8)
+    net = RandomNetwork(40, 4, 3, p_connect_input=0.2, p_connect_output=0.2,learning_rate=0.01)
+    #net = LayeredNetwork(4, 3, 5, 10)
     print('building network')
     net.build_network()
     print('forward propagation')
     #print(net.solve([0.1,0.3,0.4], clear_node_outputs=False))
     #net.compute_all_gradients([0.5,0.5])
     print('done')
-    net.train(training_data, training_targets, epochs=40)
+    net.train(training_data, training_targets, epochs=20)
     # test model
     accuracy = 0
     for i in range(len(testing_data)):
