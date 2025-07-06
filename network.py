@@ -225,8 +225,6 @@ class Network:
         # set the gradients in the output layer
         output_values = np.array([self.output_layer[i].get_value() for i in self.output_layer])
         output_gradients = self.cost_function.derivative(output_values, expected_output)
-        print('cost')
-        print(self.cost_function.function(output_values, expected_output))
         for i, grad in enumerate(output_gradients):
             self.output_layer[i].set_gradient(grad)
         # start at input layer and solve recursively
@@ -272,6 +270,42 @@ class Network:
                 self.adjust_weights()  # update weights based on gradients
                 self.clear_node_outputs()  # clear outputs and gradients
 
+    def evaluate_accuracy(self, x_test, y_test):
+        """
+        x_test: test data
+        y_test: test labels
+        
+        This method evaluates the accuracy of the network on test data
+        """
+        correct = 0
+        total = len(x_test)
+        
+        for i in range(total):
+            test_output = self.solve(x_test[i,:], clear_node_outputs=True)
+            expected_label = list(y_test[i,:]).index(1)
+            actual_label = list(test_output).index(max(test_output))
+            if expected_label == actual_label:
+                correct += 1
+        
+        return correct / total
+
+    def copy_connections(self):
+        """
+        This method creates a deep copy of the current connection matrices
+        """
+        return {
+            'input_connections': copy.deepcopy(self.input_connections),
+            'hidden_connections': copy.deepcopy(self.hidden_connections),
+            'output_connections': copy.deepcopy(self.output_connections)
+        }
+
+    def restore_connections(self, connections):
+        """
+        This method restores connection matrices from a saved state
+        """
+        self.input_connections = copy.deepcopy(connections['input_connections'])
+        self.hidden_connections = copy.deepcopy(connections['hidden_connections'])
+        self.output_connections = copy.deepcopy(connections['output_connections'])
 
     def clear_node_outputs(self):
         """
@@ -301,7 +335,8 @@ class RandomNetwork(Network):
         self.input_connections = np.zeros((n_inputs, n_neurons))  # adjacency matrix for input nodes and hidden neurons
         self.hidden_connections = np.zeros((n_neurons, n_neurons))  # adjacency matrix for hidden neurons
         self.output_connections = np.zeros((n_outputs, n_neurons))  # adjacency matrix for hidden neurons and outputs
-        self.define_connections(p_connect_input=p_connect_input, p_connect_output=p_connect_output, max_distance=max_distance)
+        self.max_distance = max_distance if max_distance else int(np.sqrt(n_neurons))
+        self.define_connections(p_connect_input=p_connect_input, p_connect_output=p_connect_output, max_distance=self.max_distance)
 
     def define_connections(self, p_connect_input=0.1, p_connect_output=0.1, max_distance=None):
         if max_distance is None:
@@ -342,6 +377,157 @@ class RandomNetwork(Network):
                 if not max_distance_exceeded:
                     self.hidden_connections = test_matrix
 
+    def prune_network(self, x_train, y_train, x_test, y_test, max_cycles=50, convergence_threshold=0.001, 
+                     mutation_rate=0.1, training_epochs=10):
+        """
+        Evolutionary pruning algorithm that adds/removes connections to improve network performance
+        
+        x_train, y_train: training data
+        x_test, y_test: test data for evaluation
+        max_cycles: maximum number of pruning cycles
+        convergence_threshold: stop if accuracy improvement is below this threshold
+        mutation_rate: probability of modifying each connection
+        training_epochs: epochs to train after each structural change
+        """
+        print("Starting network pruning...")
+        
+        # Get initial baseline accuracy
+        self.build_network()
+        self.train(x_train, y_train, epochs=training_epochs)
+        best_accuracy = self.evaluate_accuracy(x_test, y_test)
+        best_connections = self.copy_connections()
+        
+        print(f"Initial accuracy: {best_accuracy:.4f}")
+        
+        no_improvement_count = 0
+        
+        for cycle in range(max_cycles):
+            print(f"\nPruning cycle {cycle + 1}/{max_cycles}")
+            
+            # Save current state
+            current_connections = self.copy_connections()
+            
+            # Apply mutations to the network structure
+            mutations_applied = self._apply_structural_mutations(mutation_rate)
+            
+            if mutations_applied == 0:
+                print("No valid mutations found, continuing...")
+                continue
+            
+            print(f"Applied {mutations_applied} structural mutations")
+            
+            # Rebuild and retrain the network
+            try:
+                self.build_network()
+                self.train(x_train, y_train, epochs=training_epochs)
+                current_accuracy = self.evaluate_accuracy(x_test, y_test)
+                
+                print(f"Current accuracy: {current_accuracy:.4f}")
+                
+                # Check if this is an improvement
+                if current_accuracy > best_accuracy + convergence_threshold:
+                    improvement = current_accuracy - best_accuracy
+                    print(f"Improvement found: +{improvement:.4f}")
+                    best_accuracy = current_accuracy
+                    best_connections = self.copy_connections()
+                    no_improvement_count = 0
+                else:
+                    # Revert to previous state if no improvement
+                    print("No improvement, reverting changes")
+                    self.restore_connections(current_connections)
+                    no_improvement_count += 1
+                    
+            except Exception as e:
+                print(f"Error during training: {e}, reverting changes")
+                self.restore_connections(current_connections)
+                no_improvement_count += 1
+            
+            # Check for convergence
+            if no_improvement_count >= 10:
+                print("No improvement for 10 cycles, stopping early")
+                break
+        
+        # Restore best configuration
+        self.restore_connections(best_connections)
+        self.build_network()
+        self.train(x_train, y_train, epochs=training_epochs)
+        
+        final_accuracy = self.evaluate_accuracy(x_test, y_test)
+        print(f"\nPruning complete!")
+        print(f"Final accuracy: {final_accuracy:.4f}")
+        print(f"Total improvement: {final_accuracy - (best_accuracy - (final_accuracy - best_accuracy)):.4f}")
+        
+        return final_accuracy
+
+    def _apply_structural_mutations(self, mutation_rate):
+        """
+        Apply random structural mutations to the network
+        """
+        mutations_applied = 0
+        
+        # Mutate input connections
+        for i in range(self.n_inputs):
+            for j in range(self.n_neurons):
+                if random.random() < mutation_rate:
+                    if self._can_modify_input_connection(i, j):
+                        self.input_connections[i, j] = 1 - self.input_connections[i, j]
+                        mutations_applied += 1
+        
+        # Mutate output connections
+        for i in range(self.n_outputs):
+            for j in range(self.n_neurons):
+                if random.random() < mutation_rate:
+                    if self._can_modify_output_connection(i, j):
+                        self.output_connections[i, j] = 1 - self.output_connections[i, j]
+                        mutations_applied += 1
+        
+        # Mutate hidden connections
+        for i in range(self.n_neurons):
+            for j in range(self.n_neurons):
+                if i != j and random.random() < mutation_rate:
+                    if self._can_modify_hidden_connection(i, j):
+                        self.hidden_connections[i, j] = 1 - self.hidden_connections[i, j]
+                        mutations_applied += 1
+        
+        return mutations_applied
+
+    def _can_modify_input_connection(self, input_idx, neuron_idx):
+        """
+        Check if an input connection can be safely modified
+        """
+        # Always allow input connection modifications
+        return True
+
+    def _can_modify_output_connection(self, output_idx, neuron_idx):
+        """
+        Check if an output connection can be safely modified
+        """
+        # Ensure at least one connection to each output
+        if self.output_connections[output_idx, neuron_idx] == 1:
+            return np.sum(self.output_connections[output_idx, :]) > 1
+        return True
+
+    def _can_modify_hidden_connection(self, from_neuron, to_neuron):
+        """
+        Check if a hidden connection can be safely modified without creating cycles or violating constraints
+        """
+        # Test the modification
+        test_matrix = copy.deepcopy(self.hidden_connections)
+        test_matrix[from_neuron, to_neuron] = 1 - test_matrix[from_neuron, to_neuron]
+        
+        # Check for cycles
+        if detect_cycle(test_matrix):
+            return False
+        
+        # Check maximum path length constraint
+        for k in range(self.n_outputs):
+            connected_nodes = [l for l in range(self.n_neurons) if self.output_connections[k, l] == 1]
+            for n in connected_nodes:
+                if max_path_length(n, test_matrix) > self.max_distance:
+                    return False
+        
+        return True
+
 
 class LayeredNetwork(Network):
     def __init__(self, n_inputs, n_outputs, n_layers, hidden_layer_width, cost_function=MSE, learning_rate=0.001):
@@ -381,29 +567,20 @@ if __name__ == '__main__':
     training_targets = targets[:120,:]
     testing_data = flower_info[120:,:]
     testing_targets = targets[120:,:]
-    # train model
-    net = RandomNetwork(40, 4, 3, p_connect_input=0.2, p_connect_output=0.2,learning_rate=0.01)
-    #net = LayeredNetwork(4, 3, 5, 10)
-    print('building network')
+    
+    # train model with pruning
+    net = RandomNetwork(40, 4, 3, p_connect_input=0.2, p_connect_output=0.2, learning_rate=0.01)
+    print('Building initial network...')
     net.build_network()
-    print('forward propagation')
-    #print(net.solve([0.1,0.3,0.4], clear_node_outputs=False))
-    #net.compute_all_gradients([0.5,0.5])
-    print('done')
-    net.train(training_data, training_targets, epochs=20)
-    # test model
-    accuracy = 0
-    for i in range(len(testing_data)):
-        test_output = net.solve(testing_data[i,:], clear_node_outputs=True)
-        expected_label = list(testing_targets[i,:]).index(1)
-        actual_label = list(test_output).index(max(test_output))
-        if expected_label == actual_label:
-            accuracy += 1
-    print(accuracy/len(testing_data))
-
-
-
-
-
-
-
+    
+    # Apply pruning to optimize network structure
+    final_accuracy = net.prune_network(
+        training_data, training_targets, 
+        testing_data, testing_targets,
+        max_cycles=30,
+        convergence_threshold=0.005,
+        mutation_rate=0.05,
+        training_epochs=15
+    )
+    
+    print(f"\nFinal optimized accuracy: {final_accuracy:.4f}")
